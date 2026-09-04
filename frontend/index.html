@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>脑电实时解码系统</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@300;400;500;600&family=Instrument+Serif:ital@0;1&family=Noto+Serif+SC:wght@400;500;600&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+  html, body, #root { height: 100%; margin: 0; }
+  body {
+    font-family: 'IBM Plex Sans', 'PingFang SC', 'Microsoft YaHei', 'Source Han Sans SC', 'Noto Sans CJK SC', ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    background: #eef0f4;
+  }
+  .font-mono { font-family: 'IBM Plex Mono', ui-monospace, monospace; }
+
+  /* Waveform scroll animation (CSS-only, fakes real-time stream) */
+  @keyframes wave-scroll {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
+  }
+  .wave-scroll { animation: wave-scroll 8s linear infinite; will-change: transform; }
+  .wave-scroll.slow { animation-duration: 12s; }
+
+  /* Status LED pulse */
+  @keyframes led-pulse {
+    0%,100% { box-shadow: 0 0 0 0 currentColor; opacity: 1; }
+    50%     { box-shadow: 0 0 0 4px transparent; opacity: 0.85; }
+  }
+  .led { animation: led-pulse 2s ease-in-out infinite; }
+
+  /* Topomap subtle drift to imply live data */
+  @keyframes topo-shift {
+    0%,100% { transform: translate(0,0); }
+    50%     { transform: translate(2px,-1px); }
+  }
+  .topo-live { animation: topo-shift 3.2s ease-in-out infinite; }
+
+  /* Prediction bar fill animation */
+  @keyframes bar-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+  /* Subtle grid background for dark theme */
+  .grid-bg-dark {
+    background-image:
+      linear-gradient(to right, rgba(255,255,255,0.03) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255,255,255,0.03) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+  .grid-bg-light {
+    background-image:
+      linear-gradient(to right, rgba(15,23,42,0.04) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(15,23,42,0.04) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+
+  /* Scanline accent for tactical theme */
+  .scanlines::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0, rgba(0,0,0,0) 2px, rgba(255,255,255,0.025) 2px, rgba(255,255,255,0.025) 3px);
+    pointer-events: none;
+  }
+
+  /* Soft glow ring (theme-tinted) */
+  .glow-ring { box-shadow: 0 0 0 1px var(--ring-color, rgba(255,255,255,0.08)), 0 10px 40px -10px var(--ring-color, rgba(34,211,238,0.15)); }
+
+  /* Frosted-glass theme: gradient background + ambient color bleed */
+  .frosted-bg {
+    background:
+      linear-gradient(135deg, #dde4ef 0%, #d8d4e8 40%, #e6d4dd 75%, #d8e2ec 100%);
+    position: relative;
+  }
+
+  /* Italic only applies to Latin glyphs; Chinese stays upright. */
+  .title-display {
+    font-family: 'Instrument Serif', 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', serif;
+    font-style: italic;
+  }
+
+  @keyframes ambient-drift {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50%      { transform: translate(20px, -10px) scale(1.05); }
+  }
+  .ambient-blob { animation: ambient-drift 18s ease-in-out infinite; will-change: transform; }
+
+  /* Tabular nums for readouts */
+  .tab-nums { font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<!-- Utilities (plain JS, no JSX) -->
+<script src="utils/buffer.js"></script>
+<script src="utils/electrodes.js"></script>
+<script src="utils/websocket.js"></script>
+<script src="utils/mock-backend.js"></script>
+
+<!-- UI (JSX, transpiled by Babel) -->
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="themes.jsx"></script>
+<script type="text/babel" src="mock-data.jsx"></script>
+<script type="text/babel" src="router.jsx"></script>
+<script type="text/babel" src="data-stream.jsx"></script>
+<script type="text/babel" src="channel-select.jsx"></script>
+<script type="text/babel" src="error-dialog.jsx"></script>
+<script type="text/babel" src="tab-bar.jsx"></script>
+<script type="text/babel" src="topbar.jsx"></script>
+<script type="text/babel" src="waveform-panel.jsx"></script>
+<script type="text/babel" src="montage-panel.jsx"></script>
+<script type="text/babel" src="topo-panel.jsx"></script>
+<script type="text/babel" src="classification-panel.jsx"></script>
+<script type="text/babel" src="waveform-detail.jsx"></script>
+<script type="text/babel" src="topo-detail.jsx"></script>
+<script type="text/babel" src="classification-detail.jsx"></script>
+<script type="text/babel" src="eval-panel.jsx"></script>
+<script type="text/babel" src="app.jsx"></script>
+</body>
+</html>
